@@ -1,43 +1,68 @@
 import { useState, useEffect } from 'react';
 import { Box, Typography, Stack, Avatar, LinearProgress } from '@mui/material';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import api from '../../api/client';
 
 interface Leaderboard { id: string; name: string; color: string; avatar?: string; total_points: number; }
+
+const MEDALS = ['🥇', '🥈', '🥉'];
 
 export function PointsWidget() {
   const [leaders, setLeaders] = useState<Leaderboard[]>([]);
 
   useEffect(() => { api.get('/points/leaderboard').then(r => setLeaders(r.data)).catch(() => {}); }, []);
 
-  const max = leaders[0]?.total_points || 1;
+  const max = Math.max(...leaders.map(l => l.total_points), 1);
 
   return (
-    <Box>
-      <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
-        <EmojiEventsIcon sx={{ color: '#ffd700' }} />
-        <Typography variant="caption" sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>Punkte</Typography>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
+        <Typography variant="caption" color="text.secondary">Punkte-Rangliste</Typography>
+        <Typography sx={{ fontSize: '0.62rem', color: 'rgba(255,196,0,0.7)', fontWeight: 600, letterSpacing: '0.05em' }}>⭐ STARS</Typography>
       </Stack>
-      {leaders.length === 0
-        ? <Typography variant="body2" color="text.secondary">Keine Kinder</Typography>
-        : leaders.map((l, i) => (
-          <Box key={l.id} sx={{ mb: 1.5 }}>
-            <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
-              <Typography sx={{ fontSize: '1rem' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</Typography>
-              <Avatar sx={{ width: 24, height: 24, bgcolor: l.color, fontSize: '0.75rem' }}>
-                {l.name[0]}
-              </Avatar>
-              <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>{l.name}</Typography>
-              <Typography variant="body2" fontWeight={700} sx={{ color: 'warning.main' }}>{l.total_points} P</Typography>
-            </Stack>
-            <LinearProgress
-              variant="determinate"
-              value={(l.total_points / max) * 100}
-              sx={{ height: 6, borderRadius: 3, bgcolor: 'rgba(255,215,0,0.15)', '& .MuiLinearProgress-bar': { bgcolor: '#ffd700' } }}
-            />
-          </Box>
-        ))
-      }
+
+      {leaders.length === 0 ? (
+        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>Keine Kinder</Typography>
+        </Box>
+      ) : (
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {leaders.map((l, i) => (
+            <Box key={l.id}>
+              <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
+                <Typography sx={{ fontSize: '1rem', lineHeight: 1, minWidth: 20 }}>{MEDALS[i] || '🏅'}</Typography>
+                <Avatar sx={{ width: 22, height: 22, bgcolor: l.color, fontSize: '0.65rem', fontWeight: 700 }}>
+                  {l.name[0]}
+                </Avatar>
+                <Typography sx={{ flex: 1, fontSize: '0.8rem', fontWeight: 600, lineHeight: 1 }}>{l.name}</Typography>
+                <Box sx={{
+                  px: 1, py: 0.3, borderRadius: 1.5,
+                  background: 'rgba(255,196,0,0.12)', border: '1px solid rgba(255,196,0,0.25)',
+                }}>
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: '#ffd740', fontVariantNumeric: 'tabular-nums', fontFamily: '"JetBrains Mono", monospace', lineHeight: 1 }}>
+                    {l.total_points}
+                  </Typography>
+                </Box>
+              </Stack>
+              <LinearProgress
+                variant="determinate"
+                value={(l.total_points / max) * 100}
+                sx={{
+                  height: 4, borderRadius: 2, ml: '52px',
+                  bgcolor: 'rgba(255,196,0,0.08)',
+                  '& .MuiLinearProgress-bar': {
+                    background: i === 0
+                      ? 'linear-gradient(90deg, #ffd740, #ffab00)'
+                      : i === 1 ? 'linear-gradient(90deg, #b0bec5, #78909c)'
+                      : 'linear-gradient(90deg, #cd7f32, #a1672a)',
+                    borderRadius: 2,
+                  },
+                }}
+              />
+            </Box>
+          ))}
+        </Box>
+      )}
     </Box>
   );
 }
+

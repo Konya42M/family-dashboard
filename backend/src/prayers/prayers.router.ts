@@ -7,12 +7,25 @@ const router = Router();
 
 let prayerCache: { data: any; date: string; cityId: string } | null = null;
 
+function normalizePrayers(entry: any, cityId: string): object {
+  return {
+    fajr:    entry?.Imsak   || entry?.imsak   || '',
+    sunrise: entry?.Gunes   || entry?.gunes   || '',
+    dhuhr:   entry?.Ogle    || entry?.ogle    || '',
+    asr:     entry?.Ikindi  || entry?.ikindi  || '',
+    maghrib: entry?.Aksam   || entry?.aksam   || '',
+    isha:    entry?.Yatsi   || entry?.yatsi   || '',
+    date:    new Date().toISOString().split('T')[0],
+    cityId,
+  };
+}
+
 router.get('/', authenticate, async (_req: AuthRequest, res: Response) => {
   const db = getDatabase();
   const settings = db.prepare('SELECT prayer_city_id FROM settings WHERE id=1').get() as any;
   db.close();
 
-  const cityId = settings?.prayer_city_id || '9541';
+  const cityId = settings?.prayer_city_id || '11027'; // Stuttgart default
   const today = new Date().toISOString().split('T')[0];
 
   if (prayerCache?.date === today && prayerCache?.cityId === cityId) {
@@ -21,44 +34,49 @@ router.get('/', authenticate, async (_req: AuthRequest, res: Response) => {
   }
 
   try {
-    const { data } = await axios.get(`https://ezanvakti.emushaf.net/vakitler/${cityId}`, { timeout: 8000 });
-    const todayStr = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\./g, '.');
-    const todayEntry = Array.isArray(data) ? data.find((d: any) => d.MiladiTarihKisa === todayStr) || data[0] : data;
+    const { data } = await axios.get(`https://ezanvakti.emushaf.net/vakitler/${cityId}`, { timeout: 10000 });
+    if (!Array.isArray(data) || data.length === 0) throw new Error('Keine Daten');
 
-    const prayers = {
-      fajr: todayEntry?.Imsak || todayEntry?.imsak || '',
-      sunrise: todayEntry?.Gunes || todayEntry?.gunes || '',
-      dhuhr: todayEntry?.Ogle || todayEntry?.ogle || '',
-      asr: todayEntry?.Ikindi || todayEntry?.ikindi || '',
-      maghrib: todayEntry?.Aksam || todayEntry?.aksam || '',
-      isha: todayEntry?.Yatsi || todayEntry?.yatsi || '',
-      date: today,
-      cityId,
-    };
+    // Format: MiladiTarihKisa is "09.06.2026" (DD.MM.YYYY)
+    const todayFormatted = new Date().toLocaleDateString('de-DE', {
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    }).replace(/\//g, '.');
 
+    const todayEntry = data.find((d: any) => {
+      const dateStr = d.MiladiTarihKisa || d.MiladiTarihKisaIso8601?.slice(0, 10) || '';
+      // normalize both formats: "09.06.2026" or "2026-06-09"
+      const normalized = dateStr.includes('-')
+        ? new Date(dateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')
+        : dateStr;
+      return normalized === todayFormatted;
+    }) || data[0];
+
+    const prayers = normalizePrayers(todayEntry, cityId);
     prayerCache = { data: prayers, date: today, cityId };
     res.json(prayers);
   } catch (e: any) {
-    res.status(503).json({ error: 'Gebetszeiten konnten nicht geladen werden', detail: e.message });
+    res.status(503).json({ error: 'Gebetszeiten nicht verfügbar', detail: e.message });
   }
 });
 
-router.get('/cities', authenticate, async (req: AuthRequest, res: Response) => {
-  const { q } = req.query;
+router.get('/cities', authenticate, async (_req: AuthRequest, res: Response) => {
   try {
-    const { data } = await axios.get(`https://ezanvakti.emushaf.net/sehirler/2`, { timeout: 8000 });
-    if (q) {
-      const filtered = data.filter((c: any) =>
-        c.SehirAdi?.toLowerCase().includes((q as string).toLowerCase()) ||
-        c.SehirAdiEn?.toLowerCase().includes((q as string).toLowerCase())
-      );
-      res.json(filtered.slice(0, 20));
-    } else {
-      res.json(data);
-    }
-  } catch (e: any) {
+    // Germany = UlkeID 13, returns Bundesländer
+    const { data } = await axios.get('https://ezanvakti.emushaf.net/sehirler/13', { timeout: 8000 });
+    res.json(data);
+  } catch {
     res.status(503).json({ error: 'Städte konnten nicht geladen werden' });
   }
 });
 
+router.get('/districts/:sehirId', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { data } = await axios.get(`https://ezanvakti.emushaf.net/ilceler/${req.params.sehirId}`, { timeout: 8000 });
+    res.json(data);
+  } catch {
+    res.status(503).json({ error: 'Bezirke konnten nicht geladen werden' });
+  }
+});
+
 export default router;
+

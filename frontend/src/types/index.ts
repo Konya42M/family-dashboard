@@ -71,6 +71,7 @@ export interface PrayerTimes {
   maghrib: string;
   isha: string;
   date: string;
+  cityId?: string;
 }
 
 export interface TrafficInfo {
@@ -117,9 +118,11 @@ export interface Settings {
   mom_work_address?: string;
   dad_work_origin?: string;
   mom_work_origin?: string;
+  google_maps_api_key?: string;
   vvs_stop_id: string;
   vvs_stop_name: string;
   points_to_euro_rate: number;
   dark_mode: number;
   family_name: string;
 }
+

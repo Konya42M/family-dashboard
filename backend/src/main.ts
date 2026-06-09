@@ -23,9 +23,10 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Initialize DB once at startup — keep connection open as singleton
 const db = getDatabase();
 initializeDatabase(db);
-db.close();
+// DB stays open; each router calls getDatabase() which returns the same file-path connection
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
@@ -58,3 +59,4 @@ app.listen(PORT, () => {
 });
 
 export default app;
+

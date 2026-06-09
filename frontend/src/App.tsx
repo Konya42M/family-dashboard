@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Box, BottomNavigation, BottomNavigationAction, AppBar, Toolbar, Typography, IconButton, Avatar, useMediaQuery } from '@mui/material';
+import { Box, AppBar, Toolbar, Typography, IconButton, Avatar, Stack, Tooltip } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -18,14 +18,14 @@ import { TimetablePage } from './pages/TimetablePage';
 import { PointsPage } from './pages/PointsPage';
 import { SettingsPage } from './pages/SettingsPage';
 
-const NAV_ITEMS = [
-  { label: 'Start', icon: <DashboardIcon />, path: '/' },
-  { label: 'Kalender', icon: <CalendarMonthIcon />, path: '/calendar' },
-  { label: 'Aufgaben', icon: <AssignmentIcon />, path: '/todos' },
-  { label: 'Mahlzeiten', icon: <RestaurantIcon />, path: '/meals' },
-  { label: 'Stundenplan', icon: <SchoolIcon />, path: '/timetable' },
-  { label: 'Punkte', icon: <EmojiEventsIcon />, path: '/points' },
-  { label: 'Einstellungen', icon: <SettingsIcon />, path: '/settings' },
+const NAV = [
+  { label: 'Start',       icon: <DashboardIcon sx={{ fontSize: 18 }} />,     path: '/'          },
+  { label: 'Kalender',    icon: <CalendarMonthIcon sx={{ fontSize: 18 }} />, path: '/calendar'  },
+  { label: 'Aufgaben',    icon: <AssignmentIcon sx={{ fontSize: 18 }} />,    path: '/todos'     },
+  { label: 'Essen',       icon: <RestaurantIcon sx={{ fontSize: 18 }} />,    path: '/meals'     },
+  { label: 'Stundenplan', icon: <SchoolIcon sx={{ fontSize: 18 }} />,        path: '/timetable' },
+  { label: 'Punkte',      icon: <EmojiEventsIcon sx={{ fontSize: 18 }} />,   path: '/points'    },
+  { label: 'Settings',    icon: <SettingsIcon sx={{ fontSize: 18 }} />,      path: '/settings'  },
 ];
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -39,63 +39,83 @@ function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const isLandscape = useMediaQuery('(orientation: landscape)');
-
-  const currentIndex = NAV_ITEMS.findIndex(n => n.path === location.pathname);
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      <AppBar position="static" elevation={0} sx={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <Toolbar variant="dense" sx={{ minHeight: 48 }}>
-          <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1, display: { xs: 'none', sm: 'block' } }}>
-            🏠 Familien-Dashboard
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', flexDirection: 'column' }}>
+      {/* Top bar — compact for 480px height */}
+      <AppBar position="static" elevation={0} sx={{ height: 40, minHeight: 40 }}>
+        <Toolbar variant="dense" sx={{ minHeight: 40, height: 40, px: 1.5, gap: 1 }}>
+          {/* Logo */}
+          <Typography sx={{
+            fontSize: '0.8rem', fontWeight: 800, letterSpacing: '-0.02em',
+            background: 'linear-gradient(135deg, #4d90fe, #80b0ff)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            display: { xs: 'none', sm: 'block' },
+            mr: 1,
+          }}>
+            🏠 FamilyHub
           </Typography>
-          <Box sx={{ flex: 1, display: { xs: 'block', sm: 'none' } }} />
-          <Avatar sx={{ width: 28, height: 28, bgcolor: user?.color, fontSize: '0.8rem', mr: 1, cursor: 'pointer' }} onClick={() => navigate('/settings')}>
-            {user?.name[0]}
-          </Avatar>
-          <Typography variant="body2" sx={{ mr: 1, display: { xs: 'none', sm: 'block' } }}>{user?.name}</Typography>
-          <IconButton size="small" onClick={logout} color="inherit"><LogoutIcon fontSize="small" /></IconButton>
+
+          {/* Navigation */}
+          <Stack direction="row" spacing={0.3} sx={{ flex: 1 }}>
+            {NAV.map(item => {
+              const active = location.pathname === item.path;
+              return (
+                <Box
+                  key={item.path}
+                  onClick={() => navigate(item.path)}
+                  sx={{
+                    display: 'flex', alignItems: 'center', gap: 0.5,
+                    px: { xs: 0.8, sm: 1.2 }, py: 0.5,
+                    borderRadius: 2, cursor: 'pointer',
+                    background: active ? 'rgba(77,144,254,0.2)' : 'transparent',
+                    border: active ? '1px solid rgba(77,144,254,0.3)' : '1px solid transparent',
+                    color: active ? '#80b0ff' : 'rgba(255,255,255,0.45)',
+                    transition: 'all 0.2s',
+                    '&:active': { background: 'rgba(77,144,254,0.15)' },
+                    minWidth: { xs: 32, sm: 'auto' },
+                    justifyContent: 'center',
+                  }}
+                >
+                  {item.icon}
+                  <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, display: { xs: 'none', sm: 'block' } }}>
+                    {item.label}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Stack>
+
+          {/* User */}
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Avatar
+              sx={{ width: 24, height: 24, bgcolor: user?.color, fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}
+              onClick={() => navigate('/settings')}
+            >
+              {user?.name[0]}
+            </Avatar>
+            <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, display: { xs: 'none', sm: 'block' }, color: 'text.secondary' }}>
+              {user?.name}
+            </Typography>
+            <IconButton size="small" onClick={logout} sx={{ p: 0.4, color: 'rgba(255,255,255,0.4)' }}>
+              <LogoutIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Stack>
         </Toolbar>
       </AppBar>
 
-      <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: isLandscape ? 'row' : 'column' }}>
-        {isLandscape && (
-          <Box sx={{ width: 72, display: 'flex', flexDirection: 'column', alignItems: 'center', pt: 1, gap: 0.5, borderRight: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.3)' }}>
-            {NAV_ITEMS.map((item) => (
-              <IconButton key={item.path} size="small"
-                onClick={() => navigate(item.path)}
-                sx={{ width: 56, height: 56, borderRadius: 3, flexDirection: 'column', gap: 0.3, fontSize: '0.6rem',
-                  color: location.pathname === item.path ? 'primary.main' : 'text.secondary',
-                  bgcolor: location.pathname === item.path ? 'rgba(21,101,192,0.2)' : 'transparent',
-                }}>
-                {item.icon}
-                <Box component="span" sx={{ fontSize: '0.55rem', lineHeight: 1 }}>{item.label}</Box>
-              </IconButton>
-            ))}
-          </Box>
-        )}
-
-        <Box sx={{ flex: 1, overflow: 'hidden' }}>
-          <Routes>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/calendar" element={<CalendarPage />} />
-            <Route path="/todos" element={<TodosPage />} />
-            <Route path="/meals" element={<MealsPage />} />
-            <Route path="/timetable" element={<TimetablePage />} />
-            <Route path="/points" element={<PointsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Routes>
-        </Box>
+      {/* Page content */}
+      <Box sx={{ flex: 1, overflow: 'hidden' }}>
+        <Routes>
+          <Route path="/"          element={<DashboardPage />} />
+          <Route path="/calendar"  element={<CalendarPage />} />
+          <Route path="/todos"     element={<TodosPage />} />
+          <Route path="/meals"     element={<MealsPage />} />
+          <Route path="/timetable" element={<TimetablePage />} />
+          <Route path="/points"    element={<PointsPage />} />
+          <Route path="/settings"  element={<SettingsPage />} />
+        </Routes>
       </Box>
-
-      {!isLandscape && (
-        <BottomNavigation value={currentIndex} onChange={(_, v) => navigate(NAV_ITEMS[v].path)} showLabels sx={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(20px)', height: 56 }}>
-          {NAV_ITEMS.map(item => (
-            <BottomNavigationAction key={item.path} label={item.label} icon={item.icon} sx={{ minWidth: 0, '& .MuiBottomNavigationAction-label': { fontSize: '0.6rem' } }} />
-          ))}
-        </BottomNavigation>
-      )}
     </Box>
   );
 }
@@ -110,3 +130,4 @@ export default function App() {
     </Routes>
   );
 }
+
