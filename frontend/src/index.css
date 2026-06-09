@@ -2,6 +2,10 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; overflow: hidden; }
+/* Kiosk: Kein Mauszeiger auf Touchscreen */
+* { cursor: none !important; }
+/* Außer in Einstellungen/Dialog wo man tippt */
+input, textarea, [contenteditable] { cursor: none !important; }
 body {
   font-family: 'Space Grotesk', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;

@@ -12,6 +12,7 @@ import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
 import { useAuth } from './contexts/AuthContext';
 import { useThemeMode } from './contexts/ThemeContext';
 import { LoginPage } from './pages/LoginPage';
+import { KioskAutoLogin } from './pages/KioskAutoLogin';
 import { DashboardPage } from './pages/DashboardPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { TodosPage } from './pages/TodosPage';
@@ -121,6 +122,7 @@ export default function App() {
   if (isLoading) return null;
   return (
     <Routes>
+      <Route path="/kiosk" element={<KioskAutoLogin />} />
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route path="/*" element={<RequireAuth><Layout /></RequireAuth>} />
     </Routes>
