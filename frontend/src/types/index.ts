@@ -35,7 +35,7 @@ export interface Todo {
   created_by?: string;
   created_by_name?: string;
   priority: 'low' | 'medium' | 'high';
-  status: 'open' | 'in_progress' | 'done';
+  status: 'open' | 'in_progress' | 'pending_approval' | 'done';
   points: number;
 }
 

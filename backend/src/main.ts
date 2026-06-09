@@ -17,6 +17,7 @@ import pointsRouter from './points/points.router';
 import notificationsRouter from './notifications/notifications.router';
 import settingsRouter from './settings/settings.router';
 import backupRouter from './backup/backup.router';
+import weatherRouter from './weather/weather.router';
 
 dotenv.config();
 
@@ -46,6 +47,7 @@ app.use('/api/points', pointsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/backup', backupRouter);
+app.use('/api/weather', weatherRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

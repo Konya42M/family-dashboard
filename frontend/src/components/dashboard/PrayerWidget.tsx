@@ -5,183 +5,94 @@ import api from '../../api/client';
 import { PrayerTimes } from '../../types';
 import { useInterval } from '../../hooks/useInterval';
 
-const PRAYERS: { key: keyof Omit<PrayerTimes, 'date' | 'cityId'>; label: string; arabic: string; tr: string }[] = [
-  { key: 'fajr',    label: 'Fajr',    arabic: 'الفجر',  tr: 'İmsak'   },
-  { key: 'sunrise', label: 'Şuruq',   arabic: 'الشروق', tr: 'Güneş'   },
-  { key: 'dhuhr',   label: 'Dhuhr',   arabic: 'الظهر',  tr: 'Öğle'    },
-  { key: 'asr',     label: 'Asr',     arabic: 'العصر',  tr: 'İkindi'  },
-  { key: 'maghrib', label: 'Maghrib', arabic: 'المغرب', tr: 'Akşam'   },
-  { key: 'isha',    label: 'Yatsı',   arabic: 'العشاء', tr: 'Yatsı'   },
+const PRAYERS: { key: keyof Omit<PrayerTimes,'date'|'cityId'>; de: string; tr: string; ar: string }[] = [
+  { key:'fajr',    de:'Fajr',    tr:'İmsak',  ar:'الفجر'  },
+  { key:'sunrise', de:'Şuruq',   tr:'Güneş',  ar:'الشروق' },
+  { key:'dhuhr',   de:'Öğle',    tr:'Öğle',   ar:'الظهر'  },
+  { key:'asr',     de:'İkindi',  tr:'İkindi', ar:'العصر'  },
+  { key:'maghrib', de:'Akşam',   tr:'Akşam',  ar:'المغرب' },
+  { key:'isha',    de:'Yatsı',   tr:'Yatsı',  ar:'العشاء' },
 ];
 
-function parseTime(timeStr: string): Date {
-  const today = format(new Date(), 'yyyy-MM-dd');
-  try { return parse(`${today} ${timeStr}`, 'yyyy-MM-dd HH:mm', new Date()); }
+function parseT(t: string): Date {
+  try { return parse(`${format(new Date(),'yyyy-MM-dd')} ${t}`, 'yyyy-MM-dd HH:mm', new Date()); }
   catch { return new Date(); }
 }
 
-function getNextPrayer(p: PrayerTimes) {
+function nextPrayer(p: PrayerTimes) {
   const now = new Date();
   for (const pr of PRAYERS) {
     if (pr.key === 'sunrise') continue;
-    const t = parseTime(p[pr.key]);
-    if (t > now) return { ...pr, time: t, secondsLeft: differenceInSeconds(t, now) };
+    const t = parseT(p[pr.key]);
+    if (t > now) return { ...pr, time: t, secs: differenceInSeconds(t, now) };
   }
   return null;
 }
 
-function formatCountdown(s: number): string {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+function fmtCountdown(s: number) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  if (h>0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
   return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
 
-function getProgressPercent(prayers: PrayerTimes, nextKey: string): number {
-  const now = new Date();
-  const idx = PRAYERS.findIndex(p => p.key === nextKey);
-  if (idx <= 0) return 0;
-  const prevKey = PRAYERS[idx - 1].key as keyof Omit<PrayerTimes, 'date' | 'cityId'>;
-  const nKey = nextKey as keyof Omit<PrayerTimes, 'date' | 'cityId'>;
-  const prev = parseTime(prayers[prevKey]);
-  const next = parseTime(prayers[nKey]);
-  const total = differenceInSeconds(next, prev);
-  const elapsed = differenceInSeconds(now, prev);
-  return Math.min(100, Math.max(0, (elapsed / total) * 100));
-}
-
 export function PrayerWidget() {
-  const [prayers, setPrayers] = useState<PrayerTimes | null>(null);
-  const [tick, setTick] = useState(0);
+  const [prayers, setPrayers] = useState<PrayerTimes|null>(null);
+  const [, setTick] = useState(0);
 
-  useEffect(() => { api.get('/prayers').then(r => setPrayers(r.data)).catch(() => {}); }, []);
-  useInterval(() => { api.get('/prayers').then(r => setPrayers(r.data)).catch(() => {}); }, 3600000);
-  useInterval(() => setTick(t => t + 1), 1000);
+  useEffect(() => { api.get('/prayers').then(r=>setPrayers(r.data)).catch(()=>{}); }, []);
+  useInterval(() => { api.get('/prayers').then(r=>setPrayers(r.data)).catch(()=>{}); }, 3600000);
+  useInterval(() => setTick(t=>t+1), 1000);
 
-  if (!prayers) return (
-    <Box sx={{ p: 1 }}>
-      <Typography variant="caption" color="text.secondary">Gebetszeiten</Typography>
-      <Box sx={{ mt: 1 }}><LinearProgress /></Box>
-    </Box>
-  );
+  if (!prayers) return <Box><Typography variant="caption" color="text.secondary">Gebetszeiten laden...</Typography><LinearProgress sx={{mt:1}}/></Box>;
 
-  const next = getNextPrayer(prayers);
-  const progress = next ? getProgressPercent(prayers, next.key) : 0;
+  const next = nextPrayer(prayers);
+  const now = new Date();
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height:'100%', display:'flex', flexDirection:'column' }}>
       {/* Header */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.8}>
         <Typography variant="caption" color="text.secondary">Gebetszeiten · Stuttgart</Typography>
-        <Typography sx={{ fontSize: '0.62rem', color: 'rgba(255,196,0,0.7)', fontWeight: 600, letterSpacing: '0.05em' }}>
-          DIYANET
-        </Typography>
+        <Typography sx={{ fontSize:'0.58rem', color:'#f5a623', fontWeight:700, letterSpacing:'0.06em' }}>DIYANET</Typography>
       </Stack>
 
-      {/* Next Prayer Highlight */}
+      {/* Next prayer card */}
       {next && (
-        <Box className="prayer-next-glow" sx={{
-          mb: 1.5,
-          p: 1.5,
-          borderRadius: 2.5,
-          background: 'linear-gradient(135deg, rgba(255,196,0,0.12) 0%, rgba(255,196,0,0.06) 100%)',
-          border: '1px solid rgba(255,196,0,0.25)',
-        }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Box>
-              <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,196,0,0.6)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                Nächstes Gebet
-              </Typography>
-              <Stack direction="row" spacing={1} alignItems="baseline">
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#ffd740' }}>
-                  {next.label}
-                </Typography>
-                <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>
-                  {next.tr}
-                </Typography>
-                <Typography sx={{ fontSize: '0.9rem', color: 'rgba(255,196,0,0.8)', direction: 'rtl', fontFamily: 'serif' }}>
-                  {next.arabic}
-                </Typography>
-              </Stack>
-            </Box>
-            <Box sx={{ textAlign: 'right' }}>
-              <Typography sx={{
-                fontSize: '1.3rem',
-                fontWeight: 800,
-                fontVariantNumeric: 'tabular-nums',
-                fontFamily: '"JetBrains Mono", monospace',
-                color: '#ffd740',
-                lineHeight: 1,
-              }}>
-                {formatCountdown(next.secondsLeft)}
-              </Typography>
-              <Typography sx={{ fontSize: '0.62rem', color: 'rgba(255,196,0,0.5)', letterSpacing: '0.05em', mt: 0.3 }}>
-                {format(next.time, 'HH:mm')} Uhr
-              </Typography>
-            </Box>
+        <Box sx={{ mb:1, p:'8px 12px', borderRadius:2.5, background:'linear-gradient(135deg, rgba(245,166,35,0.15), rgba(245,166,35,0.07))', border:'1px solid rgba(245,166,35,0.3)' }}>
+          <Typography sx={{ fontSize:'0.58rem', color:'rgba(245,166,35,0.7)', fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase' }}>Nächstes Gebet</Typography>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mt={0.3}>
+            <Stack direction="row" spacing={1} alignItems="baseline">
+              <Typography sx={{ fontSize:'0.95rem', fontWeight:800, color:'#f5c842' }}>{next.de}</Typography>
+              <Typography sx={{ fontSize:'0.7rem', color:'rgba(255,255,255,0.45)' }}>{next.tr}</Typography>
+              <Typography sx={{ fontSize:'0.85rem', fontFamily:'serif', color:'rgba(245,166,35,0.6)', direction:'rtl' }}>{next.ar}</Typography>
+            </Stack>
+            <Typography sx={{ fontSize:'1.3rem', fontWeight:900, color:'#f5c842', fontVariantNumeric:'tabular-nums', letterSpacing:'-1px' }}>
+              {fmtCountdown(next.secs)}
+            </Typography>
           </Stack>
-          <LinearProgress
-            variant="determinate"
-            value={progress}
-            sx={{
-              mt: 1, height: 3, borderRadius: 2,
-              bgcolor: 'rgba(255,196,0,0.1)',
-              '& .MuiLinearProgress-bar': { bgcolor: 'rgba(255,196,0,0.7)', borderRadius: 2 },
-            }}
-          />
+          <LinearProgress variant="determinate"
+            value={Math.min(100, ((differenceInSeconds(now, parseT(prayers.fajr)) / Math.max(1, differenceInSeconds(next.time, parseT(prayers.fajr)))) * 100))}
+            sx={{ mt:0.8, height:2, borderRadius:1, bgcolor:'rgba(245,166,35,0.1)', '& .MuiLinearProgress-bar':{ bgcolor:'rgba(245,166,35,0.7)' } }} />
         </Box>
       )}
 
-      {/* Prayer List */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.4 }}>
+      {/* Prayer list */}
+      <Box sx={{ flex:1, display:'flex', flexDirection:'column', gap:'3px' }}>
         {PRAYERS.map(p => {
           const isNext = next?.key === p.key;
-          const time = parseTime(prayers[p.key]);
-          const isPast = !isNext && time < new Date();
+          const t = parseT(prayers[p.key]);
+          const isPast = !isNext && t < now;
           return (
-            <Stack
-              key={p.key}
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-              sx={{
-                px: 1.2,
-                py: 0.6,
-                borderRadius: 2,
-                background: isNext ? 'rgba(255,196,0,0.08)' : 'rgba(255,255,255,0.025)',
-                border: isNext ? '1px solid rgba(255,196,0,0.2)' : '1px solid transparent',
-                opacity: isPast ? 0.35 : 1,
-                transition: 'all 0.3s',
-              }}
-            >
-              <Stack direction="row" spacing={1.2} alignItems="center">
-                <Typography sx={{
-                  fontSize: '0.8rem',
-                  fontFamily: 'serif',
-                  color: isNext ? 'rgba(255,196,0,0.9)' : 'rgba(255,255,255,0.35)',
-                  direction: 'rtl',
-                  minWidth: 32,
-                  textAlign: 'right',
-                }}>
-                  {p.arabic}
-                </Typography>
+            <Stack key={p.key} direction="row" alignItems="center" justifyContent="space-between"
+              sx={{ px:1, py:'5px', borderRadius:1.5, background: isNext ? 'rgba(245,166,35,0.1)' : 'rgba(255,255,255,0.025)', border: isNext ? '1px solid rgba(245,166,35,0.25)' : '1px solid transparent', opacity: isPast ? 0.3 : 1 }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography sx={{ fontSize:'0.78rem', fontFamily:'serif', color: isNext ? 'rgba(245,166,35,0.8)' : 'rgba(255,255,255,0.25)', minWidth:28, textAlign:'right', direction:'rtl' }}>{p.ar}</Typography>
                 <Box>
-                  <Typography sx={{ fontSize: '0.78rem', fontWeight: isNext ? 700 : 500, color: isNext ? '#ffd740' : 'text.primary', lineHeight: 1 }}>
-                    {p.label}
-                  </Typography>
-                  <Typography sx={{ fontSize: '0.62rem', color: 'text.secondary', lineHeight: 1, mt: 0.1 }}>
-                    {p.tr}
-                  </Typography>
+                  <Typography sx={{ fontSize:'0.75rem', fontWeight: isNext ? 700 : 500, color: isNext ? '#f5c842' : 'text.primary', lineHeight:1 }}>{p.de}</Typography>
+                  <Typography sx={{ fontSize:'0.58rem', color:'text.secondary', lineHeight:1 }}>{p.tr}</Typography>
                 </Box>
               </Stack>
-              <Typography sx={{
-                fontWeight: 700,
-                fontVariantNumeric: 'tabular-nums',
-                fontFamily: '"JetBrains Mono", monospace',
-                fontSize: '0.85rem',
-                color: isNext ? '#ffd740' : 'rgba(255,255,255,0.7)',
-              }}>
+              <Typography sx={{ fontWeight:700, fontVariantNumeric:'tabular-nums', fontSize:'0.82rem', color: isNext ? '#f5c842' : 'rgba(255,255,255,0.7)', letterSpacing:'0.5px' }}>
                 {prayers[p.key]}
               </Typography>
             </Stack>

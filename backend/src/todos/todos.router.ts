@@ -33,20 +33,32 @@ router.put('/:id', authenticate, (req: AuthRequest, res: Response) => {
   const todo = db.prepare('SELECT * FROM todos WHERE id=?').get(req.params.id) as any;
   if (!todo) { db.close(); res.status(404).json({ error: 'Nicht gefunden' }); return; }
 
-  if (req.user!.role === 'child' && status && todo.assigned_to === req.user!.id) {
-    db.prepare('UPDATE todos SET status=?, updated_at=datetime("now") WHERE id=?').run(status, req.params.id);
-    if (status === 'done' && todo.points > 0) {
-      db.prepare('INSERT INTO point_transactions (id, user_id, points, reason, todo_id, created_by) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(uuidv4(), req.user!.id, todo.points, `Aufgabe erledigt: ${todo.title}`, todo.id, req.user!.id);
+  if (req.user!.role === 'child' && todo.assigned_to === req.user!.id) {
+    // Child can only mark as pending_approval
+    if (status === 'pending_approval') {
+      db.prepare('UPDATE todos SET status=?, updated_at=datetime("now") WHERE id=?').run('pending_approval', req.params.id);
+      db.close();
+      res.json({ success: true });
+    } else {
+      db.close();
+      res.status(403).json({ error: 'Kinder können Aufgaben nur zur Genehmigung einreichen' });
     }
-    db.close();
-    res.json({ success: true });
     return;
   }
 
   if (req.user!.role !== 'parent') { db.close(); res.status(403).json({ error: 'Kein Zugriff' }); return; }
+
+  // Parent approves → award points
+  if (status === 'done' && todo.status === 'pending_approval' && todo.points > 0) {
+    db.prepare('INSERT INTO point_transactions (id, user_id, points, reason, todo_id, created_by) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(uuidv4(), todo.assigned_to, todo.points, `Aufgabe genehmigt: ${todo.title}`, todo.id, req.user!.id);
+  }
+
+  // Parent rejects → back to open
+  const newStatus = status === 'rejected' ? 'open' : (status || todo.status);
+
   db.prepare('UPDATE todos SET title=?, description=?, due_date=?, assigned_to=?, priority=?, status=?, points=?, updated_at=datetime("now") WHERE id=?')
-    .run(title, description || null, due_date || null, assigned_to || null, priority || 'medium', status || todo.status, points || 0, req.params.id);
+    .run(title ?? todo.title, description ?? todo.description, due_date ?? todo.due_date, assigned_to ?? todo.assigned_to, priority ?? todo.priority, newStatus, points ?? todo.points, req.params.id);
   db.close();
   res.json({ success: true });
 });
@@ -59,3 +71,4 @@ router.delete('/:id', authenticate, requireParent, (req: AuthRequest, res: Respo
 });
 
 export default router;
+

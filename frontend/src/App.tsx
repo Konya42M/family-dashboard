@@ -1,31 +1,32 @@
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Box, AppBar, Toolbar, Typography, IconButton, Avatar, Stack, Tooltip } from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import RestaurantIcon from '@mui/icons-material/Restaurant';
-import SchoolIcon from '@mui/icons-material/School';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import SettingsIcon from '@mui/icons-material/Settings';
-import LogoutIcon from '@mui/icons-material/Logout';
+import { Box, AppBar, Toolbar, Typography, IconButton, Avatar, Stack, Tooltip, useTheme } from '@mui/material';
+import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
+import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
+import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded';
+import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
+import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
+import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
+import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
+import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
 import { useAuth } from './contexts/AuthContext';
+import { useThemeMode } from './contexts/ThemeContext';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { TodosPage } from './pages/TodosPage';
-import { MealsPage } from './pages/MealsPage';
 import { TimetablePage } from './pages/TimetablePage';
 import { PointsPage } from './pages/PointsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { MealsPage } from './pages/MealsPage';
 
 const NAV = [
-  { label: 'Start',       icon: <DashboardIcon sx={{ fontSize: 18 }} />,     path: '/'          },
-  { label: 'Kalender',    icon: <CalendarMonthIcon sx={{ fontSize: 18 }} />, path: '/calendar'  },
-  { label: 'Aufgaben',    icon: <AssignmentIcon sx={{ fontSize: 18 }} />,    path: '/todos'     },
-  { label: 'Essen',       icon: <RestaurantIcon sx={{ fontSize: 18 }} />,    path: '/meals'     },
-  { label: 'Stundenplan', icon: <SchoolIcon sx={{ fontSize: 18 }} />,        path: '/timetable' },
-  { label: 'Punkte',      icon: <EmojiEventsIcon sx={{ fontSize: 18 }} />,   path: '/points'    },
-  { label: 'Settings',    icon: <SettingsIcon sx={{ fontSize: 18 }} />,      path: '/settings'  },
+  { label: 'Start',      icon: <DashboardRoundedIcon sx={{ fontSize: 18 }} />,      path: '/'          },
+  { label: 'Kalender',   icon: <CalendarMonthRoundedIcon sx={{ fontSize: 18 }} />,  path: '/calendar'  },
+  { label: 'Aufgaben',   icon: <AssignmentRoundedIcon sx={{ fontSize: 18 }} />,     path: '/todos'     },
+  { label: 'Stundenplan',icon: <SchoolRoundedIcon sx={{ fontSize: 18 }} />,         path: '/timetable' },
+  { label: 'Punkte',     icon: <EmojiEventsRoundedIcon sx={{ fontSize: 18 }} />,    path: '/points'    },
+  { label: 'Einstellungen', icon: <SettingsRoundedIcon sx={{ fontSize: 18 }} />,    path: '/settings'  },
 ];
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -35,76 +36,71 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function Layout() {
+function TopBar() {
   const { user, logout } = useAuth();
+  const { darkMode, toggleDarkMode } = useThemeMode();
   const navigate = useNavigate();
   const location = useLocation();
+  const theme = useTheme();
+  const dark = theme.palette.mode === 'dark';
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', flexDirection: 'column' }}>
-      {/* Top bar — compact for 480px height */}
-      <AppBar position="static" elevation={0} sx={{ height: 40, minHeight: 40 }}>
-        <Toolbar variant="dense" sx={{ minHeight: 40, height: 40, px: 1.5, gap: 1 }}>
-          {/* Logo */}
-          <Typography sx={{
-            fontSize: '0.8rem', fontWeight: 800, letterSpacing: '-0.02em',
-            background: 'linear-gradient(135deg, #4d90fe, #80b0ff)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            display: { xs: 'none', sm: 'block' },
-            mr: 1,
-          }}>
-            🏠 FamilyHub
-          </Typography>
+    <AppBar position="static" elevation={0}>
+      <Toolbar variant="dense" sx={{ minHeight: 42, height: 42, px: 1.5, gap: 0.5 }}>
+        {/* Logo */}
+        <Typography sx={{ fontWeight: 800, fontSize: '0.82rem', color: 'primary.main', mr: 1.5, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
+          🏠 FamilyHub
+        </Typography>
 
-          {/* Navigation */}
-          <Stack direction="row" spacing={0.3} sx={{ flex: 1 }}>
-            {NAV.map(item => {
-              const active = location.pathname === item.path;
-              return (
-                <Box
-                  key={item.path}
-                  onClick={() => navigate(item.path)}
-                  sx={{
-                    display: 'flex', alignItems: 'center', gap: 0.5,
-                    px: { xs: 0.8, sm: 1.2 }, py: 0.5,
-                    borderRadius: 2, cursor: 'pointer',
-                    background: active ? 'rgba(77,144,254,0.2)' : 'transparent',
-                    border: active ? '1px solid rgba(77,144,254,0.3)' : '1px solid transparent',
-                    color: active ? '#80b0ff' : 'rgba(255,255,255,0.45)',
-                    transition: 'all 0.2s',
-                    '&:active': { background: 'rgba(77,144,254,0.15)' },
-                    minWidth: { xs: 32, sm: 'auto' },
-                    justifyContent: 'center',
-                  }}
-                >
-                  {item.icon}
-                  <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, display: { xs: 'none', sm: 'block' } }}>
-                    {item.label}
-                  </Typography>
-                </Box>
-              );
-            })}
-          </Stack>
+        {/* Nav links */}
+        <Stack direction="row" spacing={0.3} sx={{ flex: 1, overflow: 'hidden' }}>
+          {NAV.map(item => {
+            const active = location.pathname === item.path;
+            return (
+              <Box key={item.path} onClick={() => navigate(item.path)} sx={{
+                display: 'flex', alignItems: 'center', gap: '4px', px: 1, py: '5px', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap',
+                background: active ? 'rgba(91,141,238,0.15)' : 'transparent',
+                color: active ? 'primary.light' : 'text.secondary',
+                border: active ? '1px solid rgba(91,141,238,0.25)' : '1px solid transparent',
+                transition: 'all 0.15s',
+                '&:active': { opacity: 0.7 },
+              }}>
+                {item.icon}
+                <Typography sx={{ fontSize: '0.62rem', fontWeight: 700, display: { xs: 'none', sm: 'block' } }}>{item.label}</Typography>
+              </Box>
+            );
+          })}
+        </Stack>
 
-          {/* User */}
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Avatar
-              sx={{ width: 24, height: 24, bgcolor: user?.color, fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}
-              onClick={() => navigate('/settings')}
-            >
-              {user?.name[0]}
-            </Avatar>
-            <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, display: { xs: 'none', sm: 'block' }, color: 'text.secondary' }}>
-              {user?.name}
-            </Typography>
-            <IconButton size="small" onClick={logout} sx={{ p: 0.4, color: 'rgba(255,255,255,0.4)' }}>
-              <LogoutIcon sx={{ fontSize: 16 }} />
+        {/* Right: theme toggle + user */}
+        <Stack direction="row" alignItems="center" spacing={0.5}>
+          <Tooltip title={dark ? 'Light Mode' : 'Dark Mode'}>
+            <IconButton size="small" onClick={toggleDarkMode} sx={{ p: '5px', color: 'text.secondary' }}>
+              {dark ? <LightModeRoundedIcon sx={{ fontSize: 17 }} /> : <DarkModeRoundedIcon sx={{ fontSize: 17 }} />}
             </IconButton>
-          </Stack>
-        </Toolbar>
-      </AppBar>
+          </Tooltip>
+          <Avatar sx={{ width: 26, height: 26, bgcolor: user?.color || 'primary.main', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}>
+            {user?.name?.[0]}
+          </Avatar>
+          <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', display: { xs: 'none', sm: 'block' } }}>
+            {user?.name}
+          </Typography>
+          <Tooltip title="Abmelden">
+            <IconButton size="small" onClick={logout} sx={{ p: '4px', color: 'text.secondary' }}>
+              <LogoutRoundedIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      </Toolbar>
+    </AppBar>
+  );
+}
 
-      {/* Page content */}
+function Layout() {
+  const theme = useTheme();
+  return (
+    <Box sx={{ display: 'flex', height: '100vh', flexDirection: 'column', overflow: 'hidden', background: theme.palette.background.default }}>
+      <TopBar />
       <Box sx={{ flex: 1, overflow: 'hidden' }}>
         <Routes>
           <Route path="/"          element={<DashboardPage />} />

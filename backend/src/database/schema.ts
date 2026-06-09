@@ -73,7 +73,7 @@ export function initializeDatabase(db: Database.Database): void {
       assigned_to TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       priority TEXT DEFAULT 'medium' CHECK(priority IN ('low','medium','high')),
-      status TEXT DEFAULT 'open' CHECK(status IN ('open','in_progress','done')),
+      status TEXT DEFAULT 'open' CHECK(status IN ('open','in_progress','pending_approval','done')),
       points INTEGER DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -172,3 +172,4 @@ export function initializeDatabase(db: Database.Database): void {
     INSERT OR IGNORE INTO settings (id) VALUES (1);
   `);
 }
+
