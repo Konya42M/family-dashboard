@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Familien-Dashboard',
-        short_name: 'FamDash',
-        description: 'Digitales Familien-Dashboard',
+        name: 'CLX-Family-Hub',
+        short_name: 'CLX-Hub',
+        description: 'Digitales CLX-Family-Hub',
         theme_color: '#1565c0',
         background_color: '#121212',
         display: 'standalone',

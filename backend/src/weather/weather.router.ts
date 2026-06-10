@@ -53,6 +53,7 @@ router.get('/', authenticate, async (_req: AuthRequest, res: Response) => {
       date,
       maxTemp: Math.round(data.daily.temperature_2m_max[i]),
       minTemp: Math.round(data.daily.temperature_2m_min[i]),
+      code: data.daily.weather_code[i] as number,
       icon: (WMO_CODES[data.daily.weather_code[i]] || { icon: '🌡️' }).icon,
       label: (WMO_CODES[data.daily.weather_code[i]] || { label: '' }).label,
       precipitation: data.daily.precipitation_probability_max[i] || 0,
@@ -63,6 +64,7 @@ router.get('/', authenticate, async (_req: AuthRequest, res: Response) => {
       feelsLike: Math.round(cur.apparent_temperature),
       humidity: cur.relative_humidity_2m,
       windSpeed: Math.round(cur.wind_speed_10m),
+      code: cur.weather_code as number,
       icon: wmo.icon,
       label: wmo.label,
       city: 'Stuttgart',
@@ -77,4 +79,3 @@ router.get('/', authenticate, async (_req: AuthRequest, res: Response) => {
 });
 
 export default router;
-

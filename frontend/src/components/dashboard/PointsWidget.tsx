@@ -8,8 +8,16 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 
 export function PointsWidget() {
   const [leaders, setLeaders] = useState<Leaderboard[]>([]);
+  const [rate, setRate] = useState<number>(0.1);
 
   useEffect(() => { api.get('/points/leaderboard').then(r => setLeaders(r.data)).catch(() => {}); }, []);
+
+  useEffect(() => {
+    api.get('/settings').then(r => {
+      const r2euro = r.data?.points_to_euro_rate;
+      if (typeof r2euro === 'number' && r2euro > 0) setRate(r2euro);
+    }).catch(() => {});
+  }, []);
 
   const max = Math.max(...leaders.map(l => l.total_points), 1);
 
@@ -41,6 +49,9 @@ export function PointsWidget() {
                   <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: '#ffd740', fontVariantNumeric: 'tabular-nums', fontFamily: '"JetBrains Mono", monospace', lineHeight: 1 }}>
                     {l.total_points}
                   </Typography>
+                  <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                    = {(l.total_points * rate).toFixed(2)} €
+                  </Typography>
                 </Box>
               </Stack>
               <LinearProgress
@@ -65,4 +76,3 @@ export function PointsWidget() {
     </Box>
   );
 }
-

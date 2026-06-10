@@ -12,6 +12,7 @@ import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import api from '../api/client';
 import { Todo, User } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { useKiosk } from '../contexts/KioskContext';
 import { format, parseISO } from 'date-fns';
 
 type Status = 'open' | 'in_progress' | 'pending_approval' | 'done';
@@ -20,8 +21,8 @@ const PRIORITY_LABEL = { low: 'Niedrig', medium: 'Mittel', high: 'Hoch' };
 
 const STATUS_CONFIG: Record<Status, { icon: React.ReactNode; label: string; color: string }> = {
   open:             { icon: <RadioButtonUncheckedRoundedIcon sx={{ fontSize: 20 }} />, label: 'Offen',          color: '#6b7280' },
-  in_progress:      { icon: <HourglassTopRoundedIcon sx={{ fontSize: 20 }} />,        label: 'In Arbeit',      color: '#f5a623' },
-  pending_approval: { icon: <HourglassTopRoundedIcon sx={{ fontSize: 20 }} />,        label: 'Warte auf OK',   color: '#5b8dee' },
+  in_progress:      { icon: <HourglassTopRoundedIcon sx={{ fontSize: 20 }} />,        label: 'In Bearbeitung', color: '#f5a623' },
+  pending_approval: { icon: <HourglassTopRoundedIcon sx={{ fontSize: 20 }} />,        label: 'Zur Bestätigung', color: '#5b8dee' },
   done:             { icon: <CheckCircleRoundedIcon sx={{ fontSize: 20 }} />,          label: 'Erledigt',       color: '#3ecf8e' },
 };
 
@@ -32,6 +33,7 @@ export function TodosPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<Todo>>({ priority: 'medium', status: 'open', points: 0 });
   const { isParent, user } = useAuth();
+  const { isKiosk } = useKiosk();
   const theme = useTheme();
   const dark = theme.palette.mode === 'dark';
 
@@ -58,18 +60,30 @@ export function TodosPage() {
   };
 
   const submitForApproval = async (todo: Todo) => {
-    await api.put(`/todos/${todo.id}`, { status: 'pending_approval' });
-    load();
+    try {
+      await api.put(`/todos/${todo.id}`, { status: 'pending_approval' });
+      load();
+    } catch {
+      // silent
+    }
   };
 
   const approveTodo = async (todo: Todo) => {
-    await api.put(`/todos/${todo.id}`, { ...todo, status: 'done' });
-    load();
+    try {
+      await api.put(`/todos/${todo.id}`, { status: 'done' });
+      load();
+    } catch {
+      // silent
+    }
   };
 
   const rejectTodo = async (todo: Todo) => {
-    await api.put(`/todos/${todo.id}`, { ...todo, status: 'rejected' });
-    load();
+    try {
+      await api.put(`/todos/${todo.id}`, { status: 'open' });
+      load();
+    } catch {
+      // silent
+    }
   };
 
   return (
@@ -119,7 +133,7 @@ export function TodosPage() {
                 <Stack direction="row" alignItems="flex-start" spacing={1.2}>
                   {/* Status icon / action */}
                   <Box sx={{ mt: 0.2, color: sc.color, flexShrink: 0 }}>
-                    {!isParent && isMyTodo && (todo.status === 'open' || todo.status === 'in_progress') ? (
+                    {(isKiosk || (!isParent && isMyTodo)) && (todo.status === 'open' || todo.status === 'in_progress') ? (
                       <Tooltip title="Als erledigt melden (wartet auf Eltern-OK)">
                         <IconButton size="small" sx={{ p: 0.3, color: sc.color }} onClick={() => submitForApproval(todo)}>
                           {sc.icon}
@@ -137,7 +151,7 @@ export function TodosPage() {
                       </Typography>
                       <Chip size="small" label={PRIORITY_LABEL[todo.priority]}
                         sx={{ height: 18, fontSize: '0.62rem', bgcolor: `${PRIORITY_COL[todo.priority]}22`, color: PRIORITY_COL[todo.priority], border: `1px solid ${PRIORITY_COL[todo.priority]}44`, fontWeight: 700 }} />
-                      {isPending && <Chip size="small" label="⏳ Wartet auf OK" sx={{ height: 18, fontSize: '0.62rem', bgcolor: 'rgba(91,141,238,0.15)', color: '#5b8dee', fontWeight: 700 }} />}
+                      {isPending && <Chip label={STATUS_CONFIG[todo.status]?.label ?? todo.status} color={STATUS_CONFIG[todo.status]?.color as any ?? 'default'} size="small" sx={{ height: 18, fontSize: '0.62rem', fontWeight: 700 }} />}
                     </Stack>
 
                     {todo.description && (
@@ -242,4 +256,3 @@ export function TodosPage() {
     </Box>
   );
 }
-

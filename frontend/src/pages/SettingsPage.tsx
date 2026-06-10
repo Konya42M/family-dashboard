@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Stack, Card, CardContent, TextField, Button, Switch, FormControlLabel, Divider, Alert, Tabs, Tab, Select, MenuItem, FormControl, InputLabel, Avatar, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Chip, useTheme } from '@mui/material';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
@@ -37,6 +37,41 @@ export function SettingsPage() {
   const { isParent } = useAuth();
   const { darkMode, toggleDarkMode } = useThemeMode();
   const theme = useTheme();
+
+  const [destinations, setDestinations] = useState<any[]>([]);
+  const [newDest, setNewDest] = useState({ name: '', origin: '', destination: '', icon: '📍' });
+  const [destSaving, setDestSaving] = useState(false);
+
+  const loadDestinations = useCallback(async () => {
+    try {
+      const res = await api.get('/traffic/destinations');
+      setDestinations(res.data);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { loadDestinations(); }, [loadDestinations]);
+
+  const addDestination = async () => {
+    if (!newDest.name.trim() || !newDest.origin.trim() || !newDest.destination.trim()) return;
+    setDestSaving(true);
+    try {
+      await api.post('/traffic/destinations', newDest);
+      await loadDestinations();
+      setNewDest({ name: '', origin: '', destination: '', icon: '📍' });
+    } finally {
+      setDestSaving(false);
+    }
+  };
+
+  const deleteDestination = async (id: string, name: string) => {
+    if (!confirm(`Ziel "${name}" wirklich löschen?`)) return;
+    try {
+      await api.delete(`/traffic/destinations/${id}`);
+      await loadDestinations();
+    } catch {
+      alert('Fehler beim Löschen. Bitte erneut versuchen.');
+    }
+  };
 
   useEffect(() => {
     api.get('/settings').then(r => setSettings(r.data)).catch(() => {});
@@ -87,30 +122,53 @@ export function SettingsPage() {
     </Box>
   );
 
-  const TABS = ['Allgemein', 'Widgets', 'Gebete', 'Verkehr', 'ÖPNV', 'Benutzer'];
+  const TABS = ['Allgemein', 'Widgets', 'Gebete', 'Verkehr', 'ÖPNV', 'Benutzer', 'Verkehrsziele'];
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2 }, height: '100%', overflow: 'auto', background: theme.palette.background.default }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
-        <Typography variant="h5" fontWeight={800}>Einstellungen</Typography>
-        <Stack direction="row" spacing={1}>
-          <Button size="small" variant="outlined" startIcon={<DownloadRoundedIcon sx={{ fontSize: 16 }} />}
-            onClick={() => window.open('/api/backup/download', '_blank')} sx={{ fontSize: '0.72rem' }}>
-            Backup
-          </Button>
-          <Button size="small" variant="contained" startIcon={<SaveRoundedIcon sx={{ fontSize: 16 }} />}
-            onClick={handleSave} sx={{ fontSize: '0.72rem' }}>
-            Speichern
-          </Button>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: theme.palette.background.default }}>
+      <Box sx={{ p: { xs: 1.5, sm: 2 }, pb: 0, flexShrink: 0 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
+          <Typography variant="h5" fontWeight={800}>Einstellungen</Typography>
+          <Stack direction="row" spacing={1}>
+            <Button size="small" variant="outlined" startIcon={<DownloadRoundedIcon sx={{ fontSize: 16 }} />}
+              onClick={() => window.open('/api/backup/download', '_blank')} sx={{ fontSize: '0.72rem' }}>
+              Backup
+            </Button>
+            <Button size="small" variant="contained" startIcon={<SaveRoundedIcon sx={{ fontSize: 16 }} />}
+              onClick={handleSave} sx={{ fontSize: '0.72rem' }}>
+              Speichern
+            </Button>
+          </Stack>
         </Stack>
-      </Stack>
 
-      {saved && <Alert severity="success" sx={{ mb: 1.5, borderRadius: 2, py: 0.5 }}>Gespeichert!</Alert>}
+        {saved && <Alert severity="success" sx={{ mb: 1.5, borderRadius: 2, py: 0.5 }}>Gespeichert!</Alert>}
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto"
-        sx={{ mb: 1.5, minHeight: 36, '& .MuiTab-root': { minHeight: 36, py: 0, fontSize: '0.72rem', fontWeight: 700, fontFamily: 'inherit' } }}>
-        {TABS.map(t => <Tab key={t} label={t} />)}
-      </Tabs>
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          orientation="horizontal"
+          sx={{
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            mb: 0,
+            '& .MuiTab-root': {
+              fontSize: '0.78rem',
+              minHeight: 40,
+              py: 0.5,
+              fontWeight: 700,
+              fontFamily: 'inherit',
+            },
+            flexShrink: 0,
+          }}
+        >
+          {TABS.map(t => <Tab key={t} label={t} />)}
+        </Tabs>
+      </Box>
+
+      <Box sx={{ flex: 1, overflowY: 'auto', p: { xs: 1.5, sm: 2 } }}>
 
       {/* ── Tab 0: Allgemein ── */}
       {tab === 0 && (
@@ -253,6 +311,56 @@ export function SettingsPage() {
         </Stack>
       )}
 
+      {/* ── Tab 6: Verkehrsziele ── */}
+      {tab === 6 && (
+        <Stack spacing={1.5}>
+          <SectionCard>
+            <Stack spacing={2}>
+              <Typography variant="h6">Verkehrsziele verwalten</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Ziele für das Verkehrs-Widget. Google Maps API-Key wird unter "Verkehr" konfiguriert.
+              </Typography>
+
+              {destinations.map((d: any) => (
+                <Box key={d.id} sx={{
+                  display: 'flex', alignItems: 'center', gap: 1,
+                  p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2,
+                }}>
+                  <Typography sx={{ fontSize: '1.2rem' }}>{d.icon}</Typography>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.9rem' }}>{d.name}</Typography>
+                    <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
+                      {d.origin} → {d.destination}
+                    </Typography>
+                  </Box>
+                  <IconButton size="small" color="error" onClick={() => deleteDestination(d.id, d.name)}>
+                    <DeleteRoundedIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Box>
+              ))}
+
+              <Box sx={{ pt: 1, borderTop: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Typography variant="subtitle2">Neues Ziel hinzufügen</Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <TextField size="small" label="Icon (Emoji)" value={newDest.icon}
+                    onChange={e => setNewDest(d => ({ ...d, icon: e.target.value }))} sx={{ width: 80 }} />
+                  <TextField size="small" label="Name" value={newDest.name} sx={{ flex: 1 }}
+                    onChange={e => setNewDest(d => ({ ...d, name: e.target.value }))} />
+                </Box>
+                <TextField size="small" label="Startadresse (z.B. 73760 Ostfildern)" value={newDest.origin}
+                  onChange={e => setNewDest(d => ({ ...d, origin: e.target.value }))} />
+                <TextField size="small" label="Zieladresse (z.B. Stuttgart Hauptbahnhof)" value={newDest.destination}
+                  onChange={e => setNewDest(d => ({ ...d, destination: e.target.value }))} />
+                <Button variant="contained" onClick={addDestination} disabled={destSaving}
+                  sx={{ alignSelf: 'flex-start' }}>
+                  {destSaving ? 'Wird gespeichert…' : 'Ziel hinzufügen'}
+                </Button>
+              </Box>
+            </Stack>
+          </SectionCard>
+        </Stack>
+      )}
+
       {/* Add User Dialog */}
       <Dialog open={userDialog} onClose={() => setUserDialog(false)} maxWidth="xs" fullWidth>
         <DialogTitle fontWeight={700}>Benutzer hinzufügen</DialogTitle>
@@ -285,7 +393,7 @@ export function SettingsPage() {
           <Button variant="contained" onClick={handleAddUser}>Erstellen</Button>
         </DialogActions>
       </Dialog>
+      </Box>
     </Box>
   );
 }
-

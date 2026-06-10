@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Box, Typography, Stack, Select, MenuItem, FormControl, InputLabel, Card, CardContent, Chip, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, Switch, FormControlLabel } from '@mui/material';
+import { useState, useEffect, Fragment } from 'react';
+import { Box, Typography, Stack, Select, MenuItem, FormControl, InputLabel, Card, CardContent, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, Switch, FormControlLabel } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import api from '../api/client';
 import { TimetableEntry, User } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { useKiosk } from '../contexts/KioskContext';
 
 const DAYS = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
 const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -17,6 +18,8 @@ export function TimetablePage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<TimetableEntry>>({ day_of_week: 1, period: 1, is_cancelled: 0 });
   const { isParent, user } = useAuth();
+  const { isKiosk } = useKiosk();
+  const canEdit = isParent && !isKiosk;
 
   useEffect(() => {
     api.get('/users').then(r => {
@@ -35,16 +38,26 @@ export function TimetablePage() {
 
   const handleSave = async () => {
     if (!form.subject || !selectedUser) return;
-    if (form.id) { await api.put(`/timetable/${form.id}`, form); }
-    else { await api.post(`/timetable/${selectedUser}`, form); }
-    setOpen(false);
-    api.get(`/timetable/${selectedUser}`).then(r => setEntries(r.data)).catch(() => {});
+    try {
+      if (form.id) { await api.put(`/timetable/${form.id}`, form); }
+      else { await api.post(`/timetable/${selectedUser}`, form); }
+      setOpen(false);
+      api.get(`/timetable/${selectedUser}`).then(r => setEntries(r.data)).catch(() => {});
+    } catch {
+      alert('Fehler beim Speichern. Bitte erneut versuchen.');
+    }
   };
 
   const handleDelete = async () => {
-    if (form.id) { await api.delete(`/timetable/${form.id}`); }
-    setOpen(false);
-    api.get(`/timetable/${selectedUser}`).then(r => setEntries(r.data)).catch(() => {});
+    if (!form.id) return;
+    if (!confirm('Eintrag wirklich löschen?')) return;
+    try {
+      await api.delete(`/timetable/${form.id}`);
+      setOpen(false);
+      api.get(`/timetable/${selectedUser}`).then(r => setEntries(r.data)).catch(() => {});
+    } catch {
+      alert('Fehler beim Löschen. Bitte erneut versuchen.');
+    }
   };
 
   const openEdit = (day: number, period: number) => {
@@ -69,6 +82,20 @@ export function TimetablePage() {
         </Stack>
       </Stack>
 
+      {!canEdit && !isKiosk && (
+        <Box sx={{
+          p: 1.5, mb: 2,
+          bgcolor: 'rgba(33,150,243,0.1)',
+          border: '1px solid',
+          borderColor: 'info.light',
+          borderRadius: 2,
+        }}>
+          <Typography sx={{ fontSize: '0.8rem', color: 'info.main', fontWeight: 500 }}>
+            ℹ️ Der Stundenplan kann nur von Eltern bearbeitet werden.
+          </Typography>
+        </Box>
+      )}
+
       {selectedUser && (
         <Box sx={{ overflowX: 'auto' }}>
           <Box sx={{ display: 'grid', gridTemplateColumns: '60px repeat(5, 1fr)', gap: 1, minWidth: 600 }}>
@@ -77,16 +104,16 @@ export function TimetablePage() {
               <Typography key={d} variant="caption" fontWeight={700} textAlign="center" sx={{ py: 0.5, textTransform: 'uppercase', color: 'text.secondary' }}>{d}</Typography>
             ))}
             {PERIODS.map(period => (
-              <>
-                <Stack key={`p${period}`} alignItems="center" justifyContent="center" sx={{ py: 1 }}>
+              <Fragment key={period}>
+                <Stack alignItems="center" justifyContent="center" sx={{ py: 1 }}>
                   <Typography variant="caption" fontWeight={700} sx={{ color: 'text.secondary' }}>{period}.</Typography>
                 </Stack>
                 {[1, 2, 3, 4, 5].map(day => {
                   const entry = getEntry(day, period);
                   return (
                     <Card key={`${day}-${period}`}
-                      onClick={() => isParent && openEdit(day, period)}
-                      sx={{ cursor: isParent ? 'pointer' : 'default', minHeight: 60, background: entry ? (entry.is_cancelled ? 'rgba(244,67,54,0.15)' : 'rgba(21,101,192,0.15)') : 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', transition: 'all 0.2s', '&:hover': isParent ? { border: '1px solid rgba(255,255,255,0.2)' } : {} }}>
+                      onClick={() => canEdit && openEdit(day, period)}
+                      sx={{ cursor: canEdit ? 'pointer' : 'default', minHeight: 60, background: entry ? (entry.is_cancelled ? 'rgba(244,67,54,0.15)' : 'rgba(21,101,192,0.15)') : 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', transition: 'all 0.2s', '&:hover': canEdit ? { border: '1px solid rgba(255,255,255,0.2)' } : {} }}>
                       <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
                         {entry ? (
                           <>
@@ -103,14 +130,14 @@ export function TimetablePage() {
                               <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontSize: '0.65rem' }}>{entry.room}</Typography>
                             )}
                           </>
-                        ) : isParent ? (
+                        ) : canEdit ? (
                           <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.15)' }}>+</Typography>
                         ) : null}
                       </CardContent>
                     </Card>
                   );
                 })}
-              </>
+              </Fragment>
             ))}
           </Box>
         </Box>

@@ -18,8 +18,6 @@ export interface WidgetDef {
   description: string;
   minW: number;
   minH: number;
-  maxW?: number;
-  maxH?: number;
   defaultW: number;
   defaultH: number;
 }
@@ -41,6 +39,8 @@ export interface LayoutItem {
   y: number;
   w: number;
   h: number;
+  minW?: number;
+  minH?: number;
 }
 
 // Grid: 12 Spalten, Zeilenhöhe ~60px bei 800x440 (ohne Topbar)
@@ -51,6 +51,7 @@ export const DEFAULT_LAYOUT: LayoutItem[] = [
   { i: 'transit', x: 0, y: 4, w: 3, h: 3 },  // Links unten
   { i: 'today',   x: 3, y: 3, w: 3, h: 4 },  // Mitte Mitte
   { i: 'todos',   x: 6, y: 3, w: 3, h: 4 },  // Mitte rechts
+  { i: 'traffic', x: 0, y: 7, w: 12, h: 2, minW: 2, minH: 2 },  // Unten — volle Breite
 ];
 
 export const DEFAULT_ENABLED: WidgetId[] = ['clock', 'prayer', 'weather', 'transit', 'today', 'todos'];
@@ -81,4 +82,3 @@ export function loadEnabled(): WidgetId[] {
 export function saveEnabled(enabled: WidgetId[]) {
   localStorage.setItem(ENABLED_KEY, JSON.stringify(enabled));
 }
-

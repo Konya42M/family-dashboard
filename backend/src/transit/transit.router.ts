@@ -7,15 +7,28 @@ const router = Router();
 
 let departureCache: { data: any; expires: number } | null = null;
 
-router.get('/departures', authenticate, async (_req: AuthRequest, res: Response) => {
+router.get('/departures', authenticate, async (req: AuthRequest, res: Response) => {
+  const typeParam = req.query.type as string | undefined;
+
   if (departureCache && departureCache.expires > Date.now()) {
-    res.json(departureCache.data);
+    const cached = departureCache.data as { stopName: string; departures: any[] };
+    let filtered = cached.departures;
+    if (typeParam === 'rail') {
+      filtered = cached.departures.filter((d: any) => ['sbahn', 'ubahn', 'tram'].includes(d.type));
+    } else if (typeParam === 'bus') {
+      filtered = cached.departures.filter((d: any) => d.type === 'bus');
+    }
+    res.json({ stopName: cached.stopName, departures: filtered.slice(0, 8) });
     return;
   }
 
   const db = getDatabase();
-  const settings = db.prepare('SELECT vvs_stop_id, vvs_stop_name FROM settings WHERE id=1').get() as any;
-  db.close();
+  let settings: any;
+  try {
+    settings = db.prepare('SELECT vvs_stop_id, vvs_stop_name FROM settings WHERE id=1').get() as any;
+  } finally {
+    db.close();
+  }
 
   // Default: Bernsteinstraße Stuttgart (5006137)
   const stopId = settings?.vvs_stop_id || '5006137';
@@ -30,7 +43,9 @@ router.get('/departures', authenticate, async (_req: AuthRequest, res: Response)
       const planned = dep.dateTime?.time || '';
       const realtime = dep.realDateTime?.time || planned;
       const delayMin = dep.realtimeTripId ? Math.max(0, timeToMinutes(realtime) - timeToMinutes(planned)) : 0;
-      const minutesUntil = Math.max(0, timeToMinutes(realtime) - (now.getHours() * 60 + now.getMinutes()));
+      let delta = timeToMinutes(realtime) - (now.getHours() * 60 + now.getMinutes());
+      if (delta < -60) delta += 24 * 60; // Midnight overflow
+      const minutesUntil = Math.max(0, delta);
       const motType = dep.servingLine?.motType;
       return {
         line: dep.servingLine?.number || dep.servingLine?.name || '',
@@ -42,10 +57,17 @@ router.get('/departures', authenticate, async (_req: AuthRequest, res: Response)
         minutesUntil,
         platform: dep.platform || '',
       };
-    }).filter((d: any) => d.minutesUntil >= 0 && d.minutesUntil <= 90);
+    }).filter((d: any) => d.minutesUntil >= 0 && d.minutesUntil <= 90); // includes post-midnight via overflow fix
 
     departureCache = { data: { stopName, departures }, expires: Date.now() + 60 * 1000 };
-    res.json(departureCache.data);
+
+    let filtered = departures;
+    if (typeParam === 'rail') {
+      filtered = departures.filter((d: any) => ['sbahn', 'ubahn', 'tram'].includes(d.type));
+    } else if (typeParam === 'bus') {
+      filtered = departures.filter((d: any) => d.type === 'bus');
+    }
+    res.json({ stopName, departures: filtered.slice(0, 8) });
   } catch (e: any) {
     res.status(503).json({ error: 'VVS-Daten nicht verfügbar', detail: e.message });
   }
@@ -57,4 +79,3 @@ function timeToMinutes(time: string): number {
 }
 
 export default router;
-

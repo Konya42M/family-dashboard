@@ -1,76 +1,156 @@
-import { useState, useEffect } from 'react';
-import { Box, Typography, Stack, Chip } from '@mui/material';
+import { useState, useEffect, useCallback } from 'react';
+import { Box, Typography, Tabs, Tab, Chip, Stack, CircularProgress } from '@mui/material';
+import DirectionsRailwayRoundedIcon from '@mui/icons-material/DirectionsRailwayRounded';
+import DirectionsBusRoundedIcon from '@mui/icons-material/DirectionsBusRounded';
 import api from '../../api/client';
-import { useInterval } from '../../hooks/useInterval';
 
-interface Dep { line: string; direction: string; type: string; planned: string; realtime: string; delayMin: number; minutesUntil: number; platform?: string; }
-
-const TYPE_COLOR: Record<string, string> = { tram: '#5b8dee', bus: '#f5a623', sbahn: '#3ecf8e', ubahn: '#a855f7', other: '#6b7280' };
-const TYPE_LABEL: Record<string, string> = { tram: 'S', bus: 'B', sbahn: 'S', ubahn: 'U', other: '' };
-
-function LineTag({ type, line }: { type: string; line: string }) {
-  const col = TYPE_COLOR[type] || '#6b7280';
-  return (
-    <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 34, px: 0.7, py: '2px', borderRadius: 1.5, background: `${col}22`, border: `1.5px solid ${col}55` }}>
-      <Typography sx={{ fontSize: '0.72rem', fontWeight: 800, color: col, lineHeight: 1 }}>{line}</Typography>
-    </Box>
-  );
+interface Departure {
+  line: string;
+  direction: string;
+  planned: string;
+  realtime: string;
+  delayMin: number;
+  minutesUntil: number;
+  type: string;
+  platform?: string;
 }
 
-export function TransitWidget() {
-  const [data, setData] = useState<{ stopName: string; departures: Dep[] } | null>(null);
+function minutesUntil(timeStr: string): number {
+  if (!timeStr || !timeStr.includes(':')) return 99;
+  const [h, m] = timeStr.split(':').map(Number);
+  const now = new Date();
+  const depMinutes = h * 60 + m;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  let diff = depMinutes - nowMinutes;
+  if (diff < -60) diff += 24 * 60; // Midnight overflow
+  return diff;
+}
 
-  const load = () => api.get('/transit/departures').then(r => setData(r.data)).catch(() => {});
-  useEffect(() => { load(); }, []);
-  useInterval(load, 60000);
+export function TransitWidget({ compact = false }: { compact?: boolean }) {
+  const [tab, setTab] = useState(0);
+  const [railDeps, setRailDeps] = useState<Departure[]>([]);
+  const [busDeps, setBusDeps] = useState<Departure[]>([]);
+  const [stopName, setStopName] = useState('ÖPNV');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const deps = data?.departures?.slice(0, 6) || [];
+  const fetchDepartures = useCallback(async () => {
+    try {
+      const [rail, bus] = await Promise.all([
+        api.get('/transit/departures?type=rail').then(r => r.data),
+        api.get('/transit/departures?type=bus').then(r => r.data),
+      ]);
+      setRailDeps(Array.isArray(rail?.departures) ? rail.departures : []);
+      setBusDeps(Array.isArray(bus?.departures) ? bus.departures : []);
+      if (rail?.stopName) setStopName(rail.stopName);
+      setError('');
+    } catch {
+      setError('Keine Verbindung');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchDepartures(); }, [fetchDepartures]);
+  useEffect(() => {
+    const id = setInterval(fetchDepartures, 60_000);
+    return () => clearInterval(id);
+  }, [fetchDepartures]);
+
+  // Countdown-Tick alle 30 Sekunden
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const deps = tab === 0 ? railDeps : busDeps;
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={0.8}>
-        <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.6rem', fontWeight: 700 }}>
-          {data?.stopName || 'ÖPNV'}
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Stack direction="row" alignItems="center" sx={{ px: 1.5, pt: 1, pb: 0.5, flexShrink: 0 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: compact ? '0.72rem' : '0.82rem', flex: 1 }}>
+          {stopName}
         </Typography>
         <Stack direction="row" alignItems="center" spacing={0.5}>
-          <Box className="live-dot" sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#3ecf8e' }} />
+          <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#3ecf8e' }} />
           <Typography sx={{ fontSize: '0.58rem', color: '#3ecf8e', fontWeight: 700, letterSpacing: '0.06em' }}>LIVE</Typography>
         </Stack>
       </Stack>
 
-      {deps.length === 0 ? (
-        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>Keine Abfahrten</Typography>
-        </Box>
-      ) : (
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', overflow: 'hidden' }}>
-          {deps.map((d, i) => (
-            <Stack key={i} direction="row" alignItems="center" spacing={0.8} sx={{
-              px: '8px', py: '5px', borderRadius: 2,
-              background: 'rgba(128,128,128,0.06)',
-              border: '1px solid rgba(128,128,128,0.1)',
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        variant="fullWidth"
+        sx={{
+          minHeight: 32,
+          flexShrink: 0,
+          '& .MuiTab-root': { minHeight: 32, py: 0, fontSize: '0.7rem' },
+        }}
+      >
+        <Tab icon={<DirectionsRailwayRoundedIcon sx={{ fontSize: 14 }} />} iconPosition="start" label="Bahn" />
+        <Tab icon={<DirectionsBusRoundedIcon sx={{ fontSize: 14 }} />} iconPosition="start" label="Bus" />
+      </Tabs>
+
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 1 }}>
+        {loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
+            <CircularProgress size={20} />
+          </Box>
+        )}
+        {error && (
+          <Typography sx={{ fontSize: '0.75rem', color: 'error.main', p: 1 }}>{error}</Typography>
+        )}
+        {!loading && !error && deps.map((dep, i) => {
+          const displayTime = dep.realtime || dep.planned;
+          const mins = minutesUntil(displayTime);
+          const isDelayed = dep.delayMin > 0;
+          const minuteColor = mins <= 0 ? 'error.main' : mins <= 3 ? 'warning.main' : 'success.main';
+          const chipColor = tab === 0 ? '#1565c0' : '#2e7d32';
+          return (
+            <Box key={`${dep.line}-${dep.planned}-${i}`} sx={{
+              display: 'flex', alignItems: 'center', gap: 1, py: 0.75,
+              borderBottom: '1px solid', borderColor: 'divider',
             }}>
-              <LineTag type={d.type} line={d.line} />
-              <Typography sx={{ flex: 1, fontSize: '0.72rem', fontWeight: 500, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {d.direction}
-              </Typography>
-              <Box sx={{ textAlign: 'right', minWidth: 44 }}>
-                {d.minutesUntil <= 1 ? (
-                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 800, color: '#f56565' }}>Jetzt</Typography>
-                ) : (
-                  <Typography sx={{ fontSize: '0.82rem', fontWeight: 800, color: d.delayMin > 0 ? '#f5a623' : 'text.primary', letterSpacing: '-0.5px' }} className="num">
-                    {d.minutesUntil}'
-                  </Typography>
-                )}
-                {d.delayMin > 0 && (
-                  <Typography sx={{ fontSize: '0.58rem', color: '#f5a623' }}>+{d.delayMin}m</Typography>
-                )}
+              <Chip
+                label={dep.line}
+                size="small"
+                sx={{
+                  fontWeight: 800, fontSize: '0.65rem', minWidth: 36,
+                  bgcolor: chipColor, color: '#fff',
+                }}
+              />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{
+                  fontSize: '0.72rem', fontWeight: 600,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {dep.direction}
+                </Typography>
+                <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>
+                  {dep.realtime || dep.planned} Uhr
+                  {isDelayed && (
+                    <span style={{ color: '#f44336', marginLeft: 4 }}>+{dep.delayMin} min</span>
+                  )}
+                </Typography>
               </Box>
-            </Stack>
-          ))}
-        </Box>
-      )}
+              <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                <Typography sx={{
+                  fontSize: '0.8rem', fontWeight: 800,
+                  color: minuteColor,
+                }}>
+                  {mins <= 0 ? 'Jetzt' : `${mins} min`}
+                </Typography>
+              </Box>
+            </Box>
+          );
+        })}
+        {!loading && !error && deps.length === 0 && (
+          <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', p: 1 }}>
+            Keine Abfahrten
+          </Typography>
+        )}
+      </Box>
     </Box>
   );
 }
-

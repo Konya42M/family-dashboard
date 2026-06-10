@@ -1,93 +1,114 @@
-import { useState, useEffect } from 'react';
-import { Box, Typography, Stack } from '@mui/material';
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
+import { useState, useEffect, useCallback } from 'react';
+import { Box, Typography, Stack, Chip, CircularProgress } from '@mui/material';
 import api from '../../api/client';
-import { useInterval } from '../../hooks/useInterval';
 
-interface TrafficInfo { duration_normal?: string; duration_traffic?: string; distance?: string; delay_seconds?: number; status?: 'green' | 'yellow' | 'red'; error?: string; }
-interface TrafficData { dad: TrafficInfo | null; mom: TrafficInfo | null; error?: string; }
-
-const STATUS_COLOR = { green: '#4caf50', yellow: '#ff9800', red: '#f44336' };
-const STATUS_LABEL = { green: 'Frei', yellow: 'Leicht', red: 'Stau' };
-const STATUS_BG = { green: 'rgba(76,175,80,0.12)', yellow: 'rgba(255,152,0,0.12)', red: 'rgba(244,67,54,0.12)' };
-
-function TrafficRow({ label, data }: { label: string; data: TrafficInfo | null }) {
-  if (!data) return null;
-  if (data.error) return (
-    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1, py: 0.8, borderRadius: 2, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-      <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: 'text.secondary' }}>{label}</Typography>
-      <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>Nicht konfiguriert</Typography>
-    </Stack>
-  );
-  const s = data.status || 'green';
-  const color = STATUS_COLOR[s];
-  return (
-    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{
-      px: 1, py: 0.8, borderRadius: 2,
-      background: STATUS_BG[s],
-      border: `1px solid ${color}33`,
-    }}>
-      <Stack direction="row" alignItems="center" spacing={1}>
-        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color, boxShadow: `0 0 6px ${color}` }} />
-        <Box>
-          <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: 'text.primary', lineHeight: 1 }}>{label}</Typography>
-          <Typography sx={{ fontSize: '0.6rem', color: 'text.secondary', lineHeight: 1, mt: 0.2 }}>{data.distance}</Typography>
-        </Box>
-      </Stack>
-      <Box sx={{ textAlign: 'right' }}>
-        <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color, lineHeight: 1, fontVariantNumeric: 'tabular-nums', fontFamily: '"JetBrains Mono", monospace' }}>
-          {data.duration_traffic || data.duration_normal}
-        </Typography>
-        {data.delay_seconds && data.delay_seconds > 60 ? (
-          <Typography sx={{ fontSize: '0.6rem', color: '#ff9800', lineHeight: 1, mt: 0.1 }}>+{Math.round(data.delay_seconds / 60)} Min</Typography>
-        ) : (
-          <Typography sx={{ fontSize: '0.6rem', color, lineHeight: 1, mt: 0.1 }}>{STATUS_LABEL[s]}</Typography>
-        )}
-      </Box>
-    </Stack>
-  );
+interface TrafficDest {
+  id: string;
+  name: string;
+  icon: string;
+  traffic: {
+    durationMins: number;
+    delayMins: number;
+    status: 'green' | 'yellow' | 'red';
+    summary: string;
+  } | null;
+  error?: string;
 }
 
-export function TrafficWidget() {
-  const [traffic, setTraffic] = useState<TrafficData | null>(null);
+const STATUS_COLOR: Record<string, string> = {
+  green: '#3ecf8e',
+  yellow: '#f5a623',
+  red: '#f56565',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  green: 'Normal',
+  yellow: 'Leichter Stau',
+  red: 'Stau',
+};
+
+export function TrafficWidget({ compact = false }: { compact?: boolean }) {
+  const [dests, setDests] = useState<TrafficDest[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = () => {
-    api.get('/traffic').then(r => { setTraffic(r.data); setLoading(false); }).catch(() => setLoading(false));
-  };
+  const fetchTraffic = useCallback(async () => {
+    try {
+      const res = await api.get('/traffic');
+      setDests(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      // silently fail – no API key or offline
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
-  useInterval(fetchData, 300000);
-
-  const hasNoConfig = traffic && !traffic.dad && !traffic.mom;
+  useEffect(() => { fetchTraffic(); }, [fetchTraffic]);
+  useEffect(() => {
+    const id = setInterval(fetchTraffic, 5 * 60_000);
+    return () => clearInterval(id);
+  }, [fetchTraffic]);
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Stack direction="row" alignItems="center" spacing={0.8} mb={1}>
-        <DirectionsCarIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-        <Typography variant="caption" color="text.secondary">Verkehr zur Arbeit</Typography>
-      </Stack>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Typography sx={{
+        fontWeight: 700, fontSize: compact ? '0.72rem' : '0.82rem',
+        px: 1.5, pt: 1, pb: 0.5, flexShrink: 0,
+      }}>
+        🚗 Verkehr
+      </Typography>
 
-      {loading ? (
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.8 }}>
-          <Box className="shimmer" sx={{ height: 44, borderRadius: 2 }} />
-          <Box className="shimmer" sx={{ height: 44, borderRadius: 2, opacity: 0.6 }} />
-        </Box>
-      ) : hasNoConfig ? (
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.8 }}>
-          <TrafficRow label="Papa" data={{ error: 'Nicht konfiguriert' }} />
-          <TrafficRow label="Mama" data={{ error: 'Nicht konfiguriert' }} />
-          <Typography sx={{ fontSize: '0.62rem', color: 'text.secondary', textAlign: 'center', mt: 0.5 }}>
-            Adressen in Einstellungen eintragen
-          </Typography>
-        </Box>
-      ) : (
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.8 }}>
-          <TrafficRow label="Papa" data={traffic?.dad || null} />
-          <TrafficRow label="Mama" data={traffic?.mom || null} />
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
+          <CircularProgress size={20} />
         </Box>
       )}
+
+      <Stack direction="row" flexWrap="wrap" gap={1} sx={{ px: 1, pb: 1, flex: 1, overflowY: 'auto', alignContent: 'flex-start' }}>
+        {dests.map(d => (
+          <Box key={d.id} sx={{
+            flex: '1 1 130px', minWidth: 110,
+            border: '1px solid', borderColor: 'divider',
+            borderRadius: 2, p: 1,
+          }}>
+            <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, mb: 0.5 }}>
+              {d.icon} {d.name}
+            </Typography>
+            {d.traffic ? (
+              <>
+                <Typography sx={{
+                  fontSize: '1.1rem', fontWeight: 800,
+                  color: STATUS_COLOR[d.traffic.status],
+                }}>
+                  {d.traffic.durationMins} min
+                </Typography>
+                {d.traffic.delayMins > 0 && (
+                  <Typography sx={{ fontSize: '0.65rem', color: '#f56565' }}>
+                    +{d.traffic.delayMins} min Stau
+                  </Typography>
+                )}
+                <Chip
+                  label={STATUS_LABEL[d.traffic.status]}
+                  size="small"
+                  sx={{
+                    fontSize: '0.6rem', height: 16, mt: 0.5,
+                    bgcolor: STATUS_COLOR[d.traffic.status] + '33',
+                    color: STATUS_COLOR[d.traffic.status],
+                  }}
+                />
+              </>
+            ) : (
+              <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                {d.error ?? 'Nicht verfügbar'}
+              </Typography>
+            )}
+          </Box>
+        ))}
+        {!loading && dests.length === 0 && (
+          <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', p: 1 }}>
+            Keine Ziele konfiguriert. Bitte in den Einstellungen hinzufügen.
+          </Typography>
+        )}
+      </Stack>
     </Box>
   );
 }
-

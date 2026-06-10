@@ -22,9 +22,10 @@ import { PointsWidget } from '../components/dashboard/PointsWidget';
 import { TrafficWidget } from '../components/dashboard/TrafficWidget';
 
 import {
-  WidgetId, LayoutItem, WIDGET_REGISTRY,
+  WidgetId, LayoutItem, WIDGET_REGISTRY, DEFAULT_LAYOUT, DEFAULT_ENABLED,
   loadLayout, saveLayout, loadEnabled, saveEnabled,
 } from '../widgets/widgetRegistry';
+import { useKiosk } from '../contexts/KioskContext';
 
 // ─── Widget content map ───────────────────────────────────────────────────────
 const WIDGET_CONTENT: Record<WidgetId, React.ReactNode> = {
@@ -182,6 +183,7 @@ function WidgetPicker({ enabled, onToggle, onClose }: {
 export function DashboardPage() {
   const theme = useTheme();
   const dark = theme.palette.mode === 'dark';
+  const { isKiosk } = useKiosk();
 
   const [editMode, setEditMode] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -201,7 +203,6 @@ export function DashboardPage() {
           i: item.i,
           x: item.x, y: item.y, w: item.w, h: item.h,
           minW: def?.minW || 2, minH: def?.minH || 2,
-          maxW: def?.maxW, maxH: def?.maxH,
           isDraggable: editMode,
           isResizable: editMode,
         } as RGLLayout;
@@ -248,20 +249,10 @@ export function DashboardPage() {
   }, []);
 
   const resetLayout = useCallback(() => {
-    // Import defaults inline to avoid circular
-    const defaults: LayoutItem[] = [
-      { i: 'clock',   x: 3, y: 0, w: 6, h: 3 },
-      { i: 'prayer',  x: 9, y: 0, w: 3, h: 7 },
-      { i: 'weather', x: 0, y: 0, w: 3, h: 4 },
-      { i: 'transit', x: 0, y: 4, w: 3, h: 3 },
-      { i: 'today',   x: 3, y: 3, w: 3, h: 4 },
-      { i: 'todos',   x: 6, y: 3, w: 3, h: 4 },
-    ];
-    const defaultEnabled: WidgetId[] = ['clock', 'prayer', 'weather', 'transit', 'today', 'todos'];
-    setLayout(defaults);
-    setEnabled(defaultEnabled);
-    saveLayout(defaults);
-    saveEnabled(defaultEnabled);
+    saveLayout(DEFAULT_LAYOUT);
+    saveEnabled(DEFAULT_ENABLED);
+    setLayout(DEFAULT_LAYOUT);
+    setEnabled(DEFAULT_ENABLED);
   }, []);
 
   return (
@@ -300,19 +291,21 @@ export function DashboardPage() {
             </Box>
           </>
         )}
-        <Box
-          onClick={() => { setEditMode(e => !e); setPickerOpen(false); }}
-          sx={{
-            display: 'flex', alignItems: 'center', gap: 0.6,
-            px: 1.2, py: '5px', borderRadius: 2, cursor: 'pointer',
-            background: editMode ? 'rgba(62,207,142,0.2)' : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
-            border: editMode ? '1px solid rgba(62,207,142,0.4)' : `1px solid ${theme.palette.divider}`,
-            '&:active': { opacity: 0.7 },
-          }}>
-          {editMode
-            ? <><LockRoundedIcon sx={{ fontSize: 14, color: '#3ecf8e' }} /><Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: '#3ecf8e' }}>Fertig</Typography></>
-            : <><EditRoundedIcon sx={{ fontSize: 14, color: 'text.secondary' }} /><Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: 'text.secondary' }}>Anpassen</Typography></>}
-        </Box>
+        {!isKiosk && (
+          <Box
+            onClick={() => { setEditMode(e => !e); setPickerOpen(false); }}
+            sx={{
+              display: 'flex', alignItems: 'center', gap: 0.6,
+              px: 1.2, py: '5px', borderRadius: 2, cursor: 'pointer',
+              background: editMode ? 'rgba(62,207,142,0.2)' : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+              border: editMode ? '1px solid rgba(62,207,142,0.4)' : `1px solid ${theme.palette.divider}`,
+              '&:active': { opacity: 0.7 },
+            }}>
+            {editMode
+              ? <><LockRoundedIcon sx={{ fontSize: 14, color: '#3ecf8e' }} /><Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: '#3ecf8e' }}>Fertig</Typography></>
+              : <><EditRoundedIcon sx={{ fontSize: 14, color: 'text.secondary' }} /><Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: 'text.secondary' }}>Anpassen</Typography></>}
+          </Box>
+        )}
       </Box>
 
       {/* Widget picker dropdown */}
@@ -346,7 +339,7 @@ export function DashboardPage() {
         onLayoutChange={handleLayoutChange as any}
         isDraggable={editMode}
         isResizable={editMode}
-        draggableHandle=".widget-drag-handle"
+        resizeHandles={['s', 'e', 'se', 'sw', 'w', 'n', 'ne', 'nw']}
         compactType="vertical"
         preventCollision={false}
         style={{ minHeight: '100%' }}
@@ -354,7 +347,7 @@ export function DashboardPage() {
         {visibleLayout.map(item => {
           const id = item.i as WidgetId;
           return (
-            <div key={id} className={editMode ? 'widget-drag-handle' : ''}>
+            <div key={id} style={{ cursor: editMode ? 'grab' : 'default' }}>
               <WidgetTile id={id} editMode={editMode} onRemove={removeWidget}>
                 {WIDGET_CONTENT[id]}
               </WidgetTile>
@@ -385,23 +378,40 @@ export function DashboardPage() {
           border-radius: 12px !important;
         }
         .react-resizable-handle {
-          background-image: none !important;
-          width: 20px !important;
-          height: 20px !important;
-          background: rgba(91,141,238,0.5) !important;
-          border-radius: 0 0 10px 0 !important;
-          opacity: 0.8 !important;
+          position: absolute;
+          width: 16px;
+          height: 16px;
+          background: none;
+          border: none;
+          opacity: 0;
+          transition: opacity 0.2s;
         }
         .react-resizable-handle::after {
-          content: '⤡' !important;
-          font-size: 10px !important;
-          color: white !important;
-          position: absolute !important;
-          bottom: 2px !important;
-          right: 3px !important;
+          content: '';
+          position: absolute;
+          width: 6px;
+          height: 6px;
+          border-color: rgba(91,141,238,0.8);
+          border-style: solid;
         }
+        .react-resizable:hover .react-resizable-handle { opacity: 1; }
+        .react-resizable-handle-se { bottom: 2px; right: 2px; cursor: se-resize; }
+        .react-resizable-handle-se::after { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+        .react-resizable-handle-sw { bottom: 2px; left: 2px; cursor: sw-resize; }
+        .react-resizable-handle-sw::after { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+        .react-resizable-handle-ne { top: 2px; right: 2px; cursor: ne-resize; }
+        .react-resizable-handle-ne::after { top: 0; right: 0; border-width: 2px 2px 0 0; }
+        .react-resizable-handle-nw { top: 2px; left: 2px; cursor: nw-resize; }
+        .react-resizable-handle-nw::after { top: 0; left: 0; border-width: 2px 0 0 2px; }
+        .react-resizable-handle-n { top: 2px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+        .react-resizable-handle-n::after { top: 0; left: 50%; transform: translateX(-50%); border-width: 2px 0 0 0; width: 12px; }
+        .react-resizable-handle-s { bottom: 2px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+        .react-resizable-handle-s::after { bottom: 0; left: 50%; transform: translateX(-50%); border-width: 0 0 2px 0; width: 12px; }
+        .react-resizable-handle-e { right: 2px; top: 50%; transform: translateY(-50%); cursor: e-resize; }
+        .react-resizable-handle-e::after { right: 0; top: 50%; transform: translateY(-50%); border-width: 0 2px 0 0; height: 12px; }
+        .react-resizable-handle-w { left: 2px; top: 50%; transform: translateY(-50%); cursor: w-resize; }
+        .react-resizable-handle-w::after { left: 0; top: 50%; transform: translateY(-50%); border-width: 0 0 0 2px; height: 12px; }
       `}</style>
     </Box>
   );
 }
-

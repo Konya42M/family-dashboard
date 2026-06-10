@@ -171,5 +171,24 @@ export function initializeDatabase(db: Database.Database): void {
 
     INSERT OR IGNORE INTO settings (id) VALUES (1);
   `);
-}
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS traffic_destinations (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      origin      TEXT NOT NULL,
+      destination TEXT NOT NULL,
+      icon        TEXT DEFAULT '📍',
+      sort_order  INTEGER DEFAULT 0,
+      active      INTEGER DEFAULT 1,
+      created_at  TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  const destCount = (db.prepare('SELECT count(*) as c FROM traffic_destinations').get() as any).c;
+  if (destCount === 0) {
+    const ins = db.prepare(`INSERT INTO traffic_destinations (id, name, origin, destination, icon, sort_order) VALUES (?, ?, ?, ?, ?, ?)`);
+    ins.run('dest-1', 'Arbeit Papa', '73760 Ostfildern', 'Stuttgart Mitte', '👨‍💼', 1);
+    ins.run('dest-2', 'Arbeit Mama', '73760 Ostfildern', 'Stuttgart Mitte', '👩‍💼', 2);
+  }
+}

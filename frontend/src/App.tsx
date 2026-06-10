@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Box, AppBar, Toolbar, Typography, IconButton, Avatar, Stack, Tooltip, useTheme } from '@mui/material';
+import BottomNavigation from '@mui/material/BottomNavigation';
+import BottomNavigationAction from '@mui/material/BottomNavigationAction';
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
 import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
 import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded';
@@ -11,6 +13,7 @@ import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
 import { useAuth } from './contexts/AuthContext';
 import { useThemeMode } from './contexts/ThemeContext';
+import { useKiosk } from './contexts/KioskContext';
 import { LoginPage } from './pages/LoginPage';
 import { KioskAutoLogin } from './pages/KioskAutoLogin';
 import { DashboardPage } from './pages/DashboardPage';
@@ -40,6 +43,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function TopBar() {
   const { user, logout } = useAuth();
   const { darkMode, toggleDarkMode } = useThemeMode();
+  const { isKiosk } = useKiosk();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -50,11 +54,11 @@ function TopBar() {
       <Toolbar variant="dense" sx={{ minHeight: 42, height: 42, px: 1.5, gap: 0.5 }}>
         {/* Logo */}
         <Typography sx={{ fontWeight: 800, fontSize: '0.82rem', color: 'primary.main', mr: 1.5, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
-          🏠 FamilyHub
+          🏠 CLX-Family-Hub
         </Typography>
 
         {/* Nav links */}
-        <Stack direction="row" spacing={0.3} sx={{ flex: 1, overflow: 'hidden' }}>
+        <Stack direction="row" spacing={0.3} sx={{ flex: 1, overflow: 'hidden', display: { xs: 'none', md: 'flex' } }}>
           {NAV.map(item => {
             const active = location.pathname === item.path;
             return (
@@ -74,26 +78,65 @@ function TopBar() {
         </Stack>
 
         {/* Right: theme toggle + user */}
-        <Stack direction="row" alignItems="center" spacing={0.5}>
-          <Tooltip title={dark ? 'Light Mode' : 'Dark Mode'}>
-            <IconButton size="small" onClick={toggleDarkMode} sx={{ p: '5px', color: 'text.secondary' }}>
-              {dark ? <LightModeRoundedIcon sx={{ fontSize: 17 }} /> : <DarkModeRoundedIcon sx={{ fontSize: 17 }} />}
-            </IconButton>
-          </Tooltip>
-          <Avatar sx={{ width: 26, height: 26, bgcolor: user?.color || 'primary.main', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}>
-            {user?.name?.[0]}
-          </Avatar>
-          <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', display: { xs: 'none', sm: 'block' } }}>
-            {user?.name}
-          </Typography>
-          <Tooltip title="Abmelden">
-            <IconButton size="small" onClick={logout} sx={{ p: '4px', color: 'text.secondary' }}>
-              <LogoutRoundedIcon sx={{ fontSize: 16 }} />
-            </IconButton>
-          </Tooltip>
-        </Stack>
+        {!isKiosk && (
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <Tooltip title={dark ? 'Light Mode' : 'Dark Mode'}>
+              <IconButton size="small" onClick={toggleDarkMode} sx={{ p: '5px', color: 'text.secondary' }}>
+                {dark ? <LightModeRoundedIcon sx={{ fontSize: 17 }} /> : <DarkModeRoundedIcon sx={{ fontSize: 17 }} />}
+              </IconButton>
+            </Tooltip>
+            <Avatar sx={{ width: 26, height: 26, bgcolor: user?.color || 'primary.main', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}>
+              {user?.name?.[0]}
+            </Avatar>
+            <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', display: { xs: 'none', sm: 'block' } }}>
+              {user?.name}
+            </Typography>
+            <Tooltip title="Abmelden">
+              <IconButton size="small" onClick={logout} sx={{ p: '4px', color: 'text.secondary' }}>
+                <LogoutRoundedIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        )}
       </Toolbar>
     </AppBar>
+  );
+}
+
+function BottomNav() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isKiosk } = useKiosk();
+
+  if (isKiosk) return null;
+
+  const value = NAV.findIndex(n => location.pathname === n.path);
+
+  return (
+    <BottomNavigation
+      value={value < 0 ? false : value}
+      onChange={(_, v) => { if (v !== false && v != null && NAV[v]) navigate(NAV[v].path); }}
+      sx={{
+        display: { xs: 'flex', md: 'none' },
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1200,
+        borderTop: '1px solid',
+        borderColor: 'divider',
+        height: 56,
+      }}
+    >
+      {NAV.map(item => (
+        <BottomNavigationAction
+          key={item.path}
+          label={item.label}
+          icon={item.icon}
+          sx={{ fontSize: '0.6rem', minWidth: 0, px: 0.5 }}
+        />
+      ))}
+    </BottomNavigation>
   );
 }
 
@@ -102,7 +145,7 @@ function Layout() {
   return (
     <Box sx={{ display: 'flex', height: '100vh', flexDirection: 'column', overflow: 'hidden', background: theme.palette.background.default }}>
       <TopBar />
-      <Box sx={{ flex: 1, overflow: 'hidden' }}>
+      <Box sx={{ flex: 1, overflow: 'auto', pb: { xs: '56px', md: 0 } }}>
         <Routes>
           <Route path="/"          element={<DashboardPage />} />
           <Route path="/calendar"  element={<CalendarPage />} />
@@ -113,6 +156,7 @@ function Layout() {
           <Route path="/settings"  element={<SettingsPage />} />
         </Routes>
       </Box>
+      <BottomNav />
     </Box>
   );
 }
@@ -128,4 +172,3 @@ export default function App() {
     </Routes>
   );
 }
-
