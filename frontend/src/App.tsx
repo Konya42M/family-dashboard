@@ -142,10 +142,15 @@ function BottomNav() {
 
 function Layout() {
   const theme = useTheme();
+  const { isKiosk } = useKiosk();
+
   return (
-    <Box sx={{ display: 'flex', height: '100vh', flexDirection: 'column', overflow: 'hidden', background: theme.palette.background.default }}>
-      <TopBar />
-      <Box sx={{ flex: 1, overflow: 'auto', pb: { xs: '56px', md: 0 } }}>
+    <Box
+      className={isKiosk ? 'kiosk-mode' : ''}
+      sx={{ display: 'flex', height: '100vh', flexDirection: 'column', overflow: 'hidden', background: theme.palette.background.default }}
+    >
+      {!isKiosk && <TopBar />}
+      <Box sx={{ flex: 1, overflow: isKiosk ? 'hidden' : 'auto', pb: { xs: isKiosk ? 0 : '56px', md: 0 } }}>
         <Routes>
           <Route path="/"          element={<DashboardPage />} />
           <Route path="/calendar"  element={<CalendarPage />} />
@@ -156,7 +161,7 @@ function Layout() {
           <Route path="/settings"  element={<SettingsPage />} />
         </Routes>
       </Box>
-      <BottomNav />
+      {!isKiosk && <BottomNav />}
     </Box>
   );
 }
